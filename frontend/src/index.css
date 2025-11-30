@@ -1,0 +1,48 @@
+:root {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #0f172a;
+  background-color: #f5f7fb;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #0f172a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at 10% 20%, #eef2ff, transparent 25%),
+    radial-gradient(circle at 90% 20%, #e0f2fe, transparent 30%),
+    radial-gradient(circle at 50% 80%, #fef9c3, transparent 25%),
+    #f5f7fb;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+p {
+  margin: 0 0 0.25rem;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  color: #0f172a;
+}

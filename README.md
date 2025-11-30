@@ -289,15 +289,15 @@ This plan is produced here. Use ChatGPT for:
 
 **Tasks:**
 
-- [ ] **Codx**: Scaffold React frontend with:
+- [x] **Codx**: Scaffold React frontend with:
   - Routing (`/`, `/spools`, `/products/:id`).
   - Simple layout (header + main content).
-- [ ] **Codx**: Add pages:
-  - [ ] `InventoryPage`: list products + active spool counts with filters.
-  - [ ] `SpoolListPage`: list spools with filters.
-  - [ ] `ProductDetailPage`: show product details and its spools.
-  - [ ] `AddSpoolPage`: manual creation form.
-- [ ] **Codx**: Wire frontend to backend APIs.
+- [x] **Codx**: Add pages:
+  - [x] `InventoryPage`: list products + active spool counts with filters.
+  - [x] `SpoolListPage`: list spools with filters.
+  - [x] `ProductDetailPage`: show product details and its spools.
+  - [x] `AddSpoolPage`: manual creation form.
+- [x] **Codx**: Wire frontend to backend APIs.
 - [ ] **Sami**: Run frontend locally, test basic workflows.
 - [ ] **Cursor**: Adjust UI layout / forms as needed for better mobile use.
 
@@ -550,3 +550,27 @@ When something big changes (e.g., you decide to add user auth, or cloud sync), c
 
 
 ---
+
+## Frontend (v1) – Running in development
+
+- Backend: start FastAPI locally (with env `DATABASE_URL` if you want a non-default DB file) using:
+  - `uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000`
+- Frontend: from `frontend/` run:
+  - `npm install` (first run)
+  - `npm run dev -- --host`
+- API base URL defaults to `http://localhost:8000/api/v1`; override with `VITE_API_BASE_URL` if running elsewhere.
+
+## Progress Log (Codex)
+
+- 2025-11-30: Implemented Phase 2 frontend (inventory, spools list, product detail, add spool form) wired to FastAPI using Vite React app. Main code in `frontend/src` with pages under `frontend/src/pages` and API helper in `frontend/src/api.ts`. Validation: `npm run build` and `pytest`.
+
+## Next Steps
+
+- **For Sami:**
+  - Pull branch `feature/v1-frontend` and start the backend (`uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000`).
+  - From `frontend/`, run `npm install` then `npm run dev -- --host`; open the provided URL and exercise the inventory/spool flows.
+  - Add a few real products/spools and confirm filters/search behave as expected.
+
+- **For Codex:**
+  - Add backend-side filtering/query params to match the frontend filters instead of client-side filtering.
+  - Extend tests for the new frontend-backend flows once backend filtering is implemented.
