@@ -37,13 +37,30 @@ class LabelParser:
         """Convert uploaded image to format suitable for OCR."""
         img = Image.open(BytesIO(image_bytes))
 
+        # Auto-rotate based on EXIF orientation (important for phone photos)
+        try:
+            from PIL import ImageOps
+            img = ImageOps.exif_transpose(img)
+        except Exception:
+            pass  # If EXIF data missing or error, continue
+
         # Convert to RGB if needed
         if img.mode != "RGB":
             img = img.convert("RGB")
 
-        # Resize if image is very small (improves OCR accuracy)
+        # Resize to optimal size for OCR (not too small, not too large)
         width, height = img.size
-        if width < 800 or height < 800:
+
+        # If image is very large (phone photos), resize down for faster processing
+        max_dimension = 2000
+        if width > max_dimension or height > max_dimension:
+            scale_factor = max_dimension / max(width, height)
+            new_width = int(width * scale_factor)
+            new_height = int(height * scale_factor)
+            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+        # If image is too small, upscale
+        elif width < 800 or height < 800:
             scale_factor = max(800 / width, 800 / height)
             new_width = int(width * scale_factor)
             new_height = int(height * scale_factor)
