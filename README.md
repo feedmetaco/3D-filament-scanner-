@@ -1,605 +1,484 @@
-# 3D Filament Scanner – Project Plan
+# 3D Filament Scanner
 
-Repo: `feedmetaco/3D-filament-scanner-`  
-Goal: Local-first web app to catalog filament spools by **scanning box labels** and optionally **importing invoices** to track price & orders.
+A production-ready web application for cataloging and managing 3D printing filament inventory. Track filament spools by brand, material, color, and storage location with purchase details and pricing.
 
-This document coordinates work between:
-
-- **Sami** (you) – human operator, environment & infra.
-- **Codx** – GitHub-connected code agent (repo-wide edits).
-- **Cursor/Claude** – local dev assistant (workspace-aware refactors & debugging).
-- **ChatGPT** – high-level planner/architect (this file’s author).
+**Live Status:** Phase 1 Complete (Backend API) | Deployed on Railway
 
 ---
 
-## 1. Product Overview
+## Quick Links
 
-### 1.1 Core Use Case
-
-You are stocking up on filament from a few main brands (Sunlu, eSUN, Bambu).  
-You want:
-
-- While shelving filament, to **take a photo of the box label** and have the app:
-  - Extract **brand, material, color, diameter, etc.**
-  - Store it as a **product + spool** entry.
-- Later, when ordering:
-  - Quickly check **what you already own** (by brand/material/color).
-
-You **do not** care about:
-- Exact weight remaining.
-- Per-print consumption.
-
-Each spool = one 1 kg unit. Inventory is count-based.
-
-### 1.2 Versions
-
-- **v1 – Local inventory**
-
-  - Self-hosted on Synology via Docker + SQLite.
-  - Add spools from:
-    - Photo of label (with OCR + brand-specific parsing).
-    - Manual form.
-  - See inventory filtered by brand/material/color.
-  - Mark spools as “used up”.
-
-- **v1.1 – Orders & pricing**
-
-  - Add **orders** with uploaded invoices (PDF/image).
-  - Parse invoice → line items → map to products.
-  - Auto-create spools with `price`, `order_date`, `vendor`.
-  - Optional: attach label photos to newly created spools.
+- **Repository:** `feedmetaco/3D-filament-scanner-`
+- **Deployment:** Railway (PostgreSQL + FastAPI)
+- **API Documentation:** `/docs` (Swagger UI) and `/redoc` (ReDoc)
+- **Tech Stack:** Python 3.11+ | FastAPI | SQLModel | PostgreSQL/SQLite
 
 ---
 
-## 2. Architecture & Tech Stack
+## Features
 
-### 2.1 Target Stack (v1)
+### ✅ Phase 1: Core Backend (Completed)
+- **Product Management:** Track unique filament types (brand, material, color, diameter)
+- **Spool Inventory:** Individual spool tracking with purchase info and storage location
+- **Status Tracking:** Mark spools as `in_stock`, `used_up`, `donated`, or `lost`
+- **REST API:** Full CRUD operations for products and spools
+- **Database:** PostgreSQL (production) or SQLite (local dev)
+- **Testing:** Automated test suite with pytest
+- **CI/CD:** GitHub Actions pipeline
 
-**Backend**
-
-- Language: Python
-- Framework: FastAPI
-- DB: SQLite (file on mounted volume)
-- ORM: SQLAlchemy or SQLModel
-- OCR: Tesseract via `pytesseract`
-- Media storage: local filesystem (`/media/labels`, `/media/invoices`)
-
-**Frontend**
-
-- SPA: React (Vite or CRA, up to the generator)
-- UI: simple table/cards-based layout, mobile-friendly
-
-**Deployment (v1)**
-
-- Docker container running:
-  - FastAPI backend
-  - (Option A) React built into static files served by FastAPI
-  - (Option B) Separate Nginx serving frontend; API at `/api`
-- Hosted on Synology NAS, accessible over LAN.
-
-> Future: If you move to cloud, DB schema should be compatible with Postgres (Supabase).
+### 🚧 Planned Features
+- **Phase 2:** React frontend with mobile-friendly UI
+- **Phase 3:** OCR label scanning (Tesseract) for quick spool entry
+- **Phase 4:** Invoice parsing and order management
+- **Phase 5:** Advanced filtering and search capabilities
 
 ---
 
-## 3. Data Model
+## Railway Deployment Guide
 
-### 3.1 v1 Entities
+### Prerequisites
+1. **Railway Account:** Free tier available at [railway.app](https://railway.app)
+2. **GitHub Repository:** Your fork/clone of this repo connected to Railway
+3. **PostgreSQL Database:** Provisioned through Railway (free tier included)
 
-#### `Product`
+### Step-by-Step Deployment
 
-Represents a **unique filament type** (e.g. “Sunlu PLA Yellow 1.75mm”).
+#### 1. Connect Repository to Railway
 
-- `id`
-- `brand` – `Sunlu`, `eSUN`, `Bambu Lab`, …
-- `line` – `PLA Basic`, `PLA+`, etc. (nullable)
-- `material` – `PLA`, `PLA+`, `PETG`, `TPU`, …
-- `color_name` – `Yellow`, `Blue`, `White`, …
-- `diameter_mm` – usually 1.75
-- `notes` – optional
-- `barcode` – label barcode, if known
-- `sku` – vendor/brand SKU, if known
-- `created_at`
-- `updated_at`
+1. Log in to Railway dashboard
+2. Click "New Project"
+3. Select "Deploy from GitHub repo"
+4. Choose `feedmetaco/3D-filament-scanner-`
+5. Railway will auto-detect the Python app
 
-Weight is implicitly **1 kg**, not stored.
+#### 2. Add PostgreSQL Database
 
-#### `Spool`
+1. In your Railway project, click "+ New"
+2. Select "Database" → "Add PostgreSQL"
+3. Railway will automatically provision a Postgres database
+4. The `DATABASE_URL` environment variable is set automatically
 
-Represents one **physical box/spool** of a `Product`.
+#### 3. Configure Environment Variables
 
-- `id`
-- `product_id` – FK → `Product`
-- `purchase_date`
-- `vendor` – `Amazon`, `Bambu`, `Micro Center`, …
-- `price` – per spool
-- `storage_location` – `Shelf A2`, `Drybox 1`, …
-- `photo_path` – local path to label image
-- `status` – enum: `in_stock`, `used_up`, `donated`, `lost`
-- (Optional for v1, required in v1.1) `order_id` – FK → `Order`
-- `created_at`
-- `updated_at`
+Railway automatically sets:
+- `PORT` - The port your app should listen on
+- `DATABASE_URL` - PostgreSQL connection string (format: `postgresql://user:pass@host:port/db`)
 
----
+**No manual configuration needed!** The app detects these automatically.
 
-### 3.2 v1.1 Entities
+#### 4. Deploy
 
-#### `Order`
+1. Railway will automatically deploy when you push to `main`
+2. Initial deployment takes 2-3 minutes
+3. Database tables are created automatically on first startup
+4. Access your API at the Railway-provided URL
 
-- `id`
-- `vendor`
-- `order_number` – vendor-specific ID
-- `order_date`
-- `invoice_path` – PDF/image path
-- `total_amount` – optional
-- `currency` – e.g. `USD`
-- `created_at`
-- `updated_at`
+#### 5. Verify Deployment
 
-#### `OrderItem`
+Once deployed, visit your Railway app URL:
+- `https://your-app.railway.app/` - Health check (returns `{"status": "ok"}`)
+- `https://your-app.railway.app/docs` - Interactive API documentation
+- `https://your-app.railway.app/api/v1/products` - Products endpoint
 
-- `id`
-- `order_id` – FK → `Order`
-- `product_id` – FK → `Product`, nullable until mapped
-- `title_raw` – raw line string from invoice
-- `quantity` – number of spools
-- `unit_price`
-- `currency`
-- `status` – `pending_mapping`, `confirmed`
-- `created_at`
-- `updated_at`
+### Managing Your Deployment
 
-Once an `OrderItem` is confirmed, **`quantity` spools** are created and linked.
+**View Logs:**
+```bash
+# Railway CLI (optional)
+railway logs
+```
+
+**Redeploy:**
+- Push changes to GitHub `main` branch
+- Railway automatically rebuilds and deploys
+
+**Database Access:**
+- Use Railway's PostgreSQL dashboard to query/inspect data
+- Or connect via `psql` using the `DATABASE_URL` from Railway
+
+**Monitor Usage:**
+- Railway free tier: 500 hours/month, 512 MB RAM
+- Check usage in Railway dashboard
 
 ---
 
-## 4. Roles & Responsibilities
+## Local Development
 
-This section defines who does what so tools don’t step on each other.
+### Initial Setup
 
-### 4.1 Sami (You)
+```bash
+# Clone repository
+git clone https://github.com/feedmetaco/3D-filament-scanner-.git
+cd "3D Filament Scanner"
 
-- Owns the **runtime environment**:
-  - Synology configuration.
-  - Docker installation / upgrades.
-  - Volume mounts & backups.
-- Runs and tests the app:
-  - Uses UI to add real filaments.
-  - Uploads label images / invoices.
-  - Reports parsing failures as examples.
-- Makes **product decisions**:
-  - When to expand features (e.g., QR codes, PWA, cloud migration).
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
-### 4.2 Codx (GitHub repo agent)
+# Install dependencies
+pip install -r backend/requirements.txt
+```
 
-Codx is responsible for **repo-wide, spec-driven coding work**:
+### Running the Server
 
-- Create and maintain:
-  - Project structure (`backend/`, `frontend/`, `docker/`).
-  - Backend models, schemas, routers, tests.
-  - Frontend pages/components.
-  - Dockerfile & docker-compose.
-- Apply **structural changes**:
-  - Add new entities (Orders, OrderItems).
-  - Add new endpoints & flows.
-  - Perform refactors that touch many files.
-- Keep code consistent with this `PROJECT_PLAN.md`.
+```bash
+# Option 1: Direct Python
+python backend/main.py
 
-Codx should **always** treat `PROJECT_PLAN.md` as the source of truth.
+# Option 2: Uvicorn with auto-reload
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 
-### 4.3 Cursor + Claude (local dev assistant)
+# Access API documentation
+# Open: http://localhost:8000/docs
+```
 
-Cursor/Claude is best used for:
+### Testing
 
-- **Local debugging**:
-  - Reading error logs from your machine.
-  - Suggesting fixes when the app doesn’t build/run.
-- **Small/mid-sized refactors**:
-  - Adjusting a function or component.
-  - Reworking a parsing rule.
-- **Environment-specific issues**:
-  - Path/permissions problems on macOS/Windows before you push.
-  - “Why is Docker not seeing Tesseract?” type issues.
+```bash
+# Run all tests
+pytest
 
-Cursor sees your **local workspace**, Codx sees the **GitHub repo**.
+# Run with verbose output
+pytest -v
 
-### 4.4 ChatGPT (Planner/Architect)
+# Run with coverage
+pytest --cov=backend --cov-report=term-missing
 
-This plan is produced here. Use ChatGPT for:
+# Run specific test file
+pytest tests/test_api.py
+```
 
-- High-level design changes:
-  - New features & architecture.
-  - Data model updates / migrations.
-- Complex reasoning:
-  - Trade-offs (SQLite vs Supabase, OCR options, etc.).
-- Producing new project docs:
-  - Updated `PROJECT_PLAN.md` sections.
-  - Additional design docs if needed.
+### Database
 
----
+**Local Development (SQLite):**
+- Database file: `backend/app.db` (auto-created)
+- No setup required, works out of the box
 
-## 5. Implementation Phases
+**Local Development (PostgreSQL):**
+```bash
+# Install PostgreSQL locally (macOS)
+brew install postgresql
+brew services start postgresql
 
-### Phase 0 – Repo Init & Ground Rules
+# Create database
+createdb filament_scanner
 
-**Owner: Sami + Codx**
+# Set environment variable
+export DATABASE_URL=postgresql://localhost:5432/filament_scanner
 
-**Goals:**
+# Run server (tables created automatically)
+python backend/main.py
+```
 
-- Initialize repo structure.
-- Commit this plan.
-- Prepare Codx & Cursor for work.
+**Reset Database:**
+```bash
+# SQLite
+rm backend/app.db
 
-**Tasks:**
-
-- [ ] **Sami**: Clone `3D-filament-scanner-` locally.
-- [ ] **Sami**: Create `PROJECT_PLAN.md` at repo root with this content.
-- [ ] **Sami**: Commit & push initial plan to GitHub.
-- [ ] **Codx**: Read `PROJECT_PLAN.md` and generate baseline project layout:
-  - [ ] Create `backend/` with FastAPI skeleton.
-  - [ ] Create `frontend/` with React skeleton.
-  - [ ] Create `docker/` or top-level `Dockerfile` + `docker-compose.yml`.
-- [ ] **Sami**: Review generated structure; adjust names/paths if needed.
+# PostgreSQL
+dropdb filament_scanner && createdb filament_scanner
+```
 
 ---
 
-### Phase 1 – v1 Backend (Products & Spools)
+## API Reference
 
-**Owner: Codx (with Cursor for debugging)**
+### Base URL
+- **Production:** `https://your-app.railway.app`
+- **Local:** `http://localhost:8000`
 
-**Goals:**
+### Endpoints
 
-- Implement backend models & API for v1.
-- Wire up SQLite + basic CRUD (no OCR yet).
+#### Health Check
+```http
+GET /
+```
+Returns: `{"status": "ok"}`
 
-**Tasks:**
+#### Products
 
-- [ ] **Codx**: Add backend dependencies:
-  - FastAPI, Uvicorn
-  - SQLAlchemy or SQLModel
-  - Pydantic
-- [ ] **Codx**: Implement `Product` and `Spool` DB models per §3.1.
-- [ ] **Codx**: Implement API endpoints:
-  - [ ] `GET /api/products` (filter by brand/material/color).
-  - [ ] `POST /api/products`.
-  - [ ] `GET /api/products/{id}`.
-  - [ ] `PATCH /api/products/{id}`.
-  - [ ] `GET /api/spools` (filter by status/product props).
-  - [ ] `POST /api/spools` (manual creation).
-  - [ ] `GET /api/spools/{id}`.
-  - [ ] `PATCH /api/spools/{id}`.
-  - [ ] `POST /api/spools/{id}/mark-used` (status = `used_up`).
-- [ ] **Codx**: Implement DB initialization & simple migration strategy (e.g., Alembic or manual).
-- [ ] **Sami**: Run backend locally:
-  - [ ] `uvicorn` or an equivalent dev server.
-  - [ ] Create a few test products/spools manually.
-  - [ ] Use **Cursor** if any errors arise.
+```http
+POST   /api/v1/products         # Create product
+GET    /api/v1/products         # List all products
+GET    /api/v1/products/{id}    # Get product by ID
+PUT    /api/v1/products/{id}    # Update product
+DELETE /api/v1/products/{id}    # Delete product
+```
 
----
+**Example Product:**
+```json
+{
+  "brand": "Sunlu",
+  "line": "PLA+",
+  "material": "PLA",
+  "color_name": "Yellow",
+  "diameter_mm": 1.75,
+  "notes": "High strength filament",
+  "barcode": "1234567890",
+  "sku": "SUN-PLA-YEL"
+}
+```
 
-### Phase 2 – v1 Frontend (Inventory UI)
+#### Spools
 
-**Owner: Codx + Cursor**
+```http
+POST   /api/v1/spools          # Create spool
+GET    /api/v1/spools          # List all spools
+GET    /api/v1/spools/{id}     # Get spool by ID
+PUT    /api/v1/spools/{id}     # Update spool
+DELETE /api/v1/spools/{id}     # Delete spool
+```
 
-**Goals:**
+**Example Spool:**
+```json
+{
+  "product_id": 1,
+  "purchase_date": "2025-12-01",
+  "vendor": "Amazon",
+  "price": 19.99,
+  "storage_location": "Shelf A2",
+  "status": "in_stock"
+}
+```
 
-- Build minimal UI to:
-  - View inventory (grouped or flat).
-  - Add/edit spools.
-  - See product details.
-
-**Tasks:**
-
-- [ ] **Codx**: Scaffold React frontend with:
-  - Routing (`/`, `/spools`, `/products/:id`).
-  - Simple layout (header + main content).
-- [ ] **Codx**: Add pages:
-  - [ ] `InventoryPage`: list products + active spool counts with filters.
-  - [ ] `SpoolListPage`: list spools with filters.
-  - [ ] `ProductDetailPage`: show product details and its spools.
-  - [ ] `AddSpoolPage`: manual creation form.
-- [ ] **Codx**: Wire frontend to backend APIs.
-- [ ] **Sami**: Run frontend locally, test basic workflows.
-- [ ] **Cursor**: Adjust UI layout / forms as needed for better mobile use.
-
----
-
-### Phase 3 – v1 Label Scanning (OCR + Parsing)
-
-**Owner: Codx + Cursor**
-
-**Goals:**
-
-- Allow adding spools “from photo”.
-- Implement brand-specific parsing for Sunlu, eSUN, Bambu.
-
-**Tasks:**
-
-- [ ] **Codx**: Add Tesseract & `pytesseract` to backend environment.
-- [ ] **Codx**: Implement file storage for label images (`/media/labels`).
-- [ ] **Codx**: Implement `POST /api/spools/from-photo`:
-  - Accept multipart image file.
-  - Store image.
-  - Run OCR (Tesseract).
-  - Run parsing pipeline:
-    - Detect brand.
-    - Parse material/color/diameter.
-  - Try to match an existing `Product`.
-  - Return:
-    - `ocr_text`
-    - `suggested_product`
-    - `matched_product_id` (if any).
-- [ ] **Codx**: Implement brand-specific parsers:
-  - [ ] `parse_sunlu_label(text)`
-  - [ ] `parse_bambu_label(text)`
-  - [ ] `parse_esun_label(text)`
-- [ ] **Codx**: Add unit tests with **sample OCR text** from your real labels.
-- [ ] **Codx**: Update `AddSpoolPage` to:
-  - Upload image.
-  - Show suggested product mapping.
-  - Allow selecting existing product OR creating new.
-  - Then fill spool metadata.
-- [ ] **Sami**: Capture real label photos and test.
-- [ ] **Cursor**: Help debug OCR failures and refine parsing rules.
+**Spool Status Values:**
+- `in_stock` - Available for use
+- `used_up` - Completely consumed
+- `donated` - Given away
+- `lost` - Cannot locate
 
 ---
 
-### Phase 4 – v1 Deployment to Synology
+## Data Model
 
-**Owner: Sami (with Cursor/ChatGPT for troubleshooting)**
+### Product
+Represents a unique filament type (e.g., "Sunlu PLA Yellow 1.75mm")
 
-**Goals:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | integer | auto | Primary key |
+| `brand` | string | ✓ | Manufacturer (Sunlu, eSUN, Bambu Lab) |
+| `line` | string | | Product line (PLA+, Pro, etc.) |
+| `material` | string | ✓ | Material type (PLA, PETG, TPU, ABS) |
+| `color_name` | string | ✓ | Color description |
+| `diameter_mm` | float | ✓ | Filament diameter (usually 1.75 or 2.85) |
+| `notes` | string | | Additional notes |
+| `barcode` | string | | Product barcode from label |
+| `sku` | string | | Vendor SKU |
+| `created_at` | datetime | auto | Creation timestamp |
+| `updated_at` | datetime | auto | Last update timestamp |
 
-- Run v1 as a Docker stack on Synology, accessible from LAN.
+**Note:** Weight is implicitly 1kg per spool (not stored in database)
 
-**Tasks:**
+### Spool
+Represents one physical spool/box of a Product
 
-- [ ] **Codx**: Finalize `Dockerfile` and `docker-compose.yml`:
-  - Backend + frontend.
-  - Volume mounts:
-    - DB file (e.g., `/app/data/db.sqlite`).
-    - Media directory (e.g., `/app/media`).
-  - Expose HTTP port (e.g., `8000:8000` or `80:80`).
-- [ ] **Sami**: Pull repo to Synology.
-- [ ] **Sami**: Run `docker compose up -d`.
-- [ ] **Sami**: Access app from phone via Synology IP.
-- [ ] **Cursor/ChatGPT**: Assist with any container/build issues (logs pasted into them).
-
----
-
-### Phase 5 – v1.1 Orders & Pricing
-
-**Owner: Codx + Sami**
-
-**Goals:**
-
-- Add order & invoice support.
-- Auto-create spools from invoice line items with price & vendor.
-
-**Tasks:**
-
-- [ ] **Codx**: Add `Order` and `OrderItem` models per §3.2.
-- [ ] **Codx**: Add API endpoints:
-  - [ ] `POST /api/orders` – create order metadata.
-  - [ ] `POST /api/orders/{id}/invoice` – upload invoice (PDF/image) and trigger parsing.
-  - [ ] `GET /api/orders/{id}` – view parsed order + items.
-  - [ ] `POST /api/orders/{id}/confirm` – confirm mappings & create spools.
-- [ ] **Codx**: Implement invoice parsing pipeline:
-  - Extract text (PDF parsing or OCR).
-  - Identify candidate line items (PLA/PETG/TPU/1.75mm/KG).
-  - Parse `title_raw`, `quantity`, `unit_price`.
-  - Attempt mapping to `Product` using same logic as label parsers.
-- [ ] **Codx**: Update frontend:
-  - [ ] `OrderListPage`.
-  - [ ] `OrderDetailPage` with mapping UI.
-  - [ ] “Add Order” wizard flow.
-- [ ] **Sami**: Provide sample orders/invoices (Amazon/Bambu PDFs).
-- [ ] **Cursor/ChatGPT**: Help refine parsing rules based on real invoice formats.
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | integer | auto | Primary key |
+| `product_id` | integer | ✓ | Foreign key to Product |
+| `purchase_date` | date | | When purchased |
+| `vendor` | string | | Where purchased (Amazon, Bambu, etc.) |
+| `price` | float | | Purchase price per spool |
+| `storage_location` | string | | Physical location (Shelf A2, Drybox 1) |
+| `photo_path` | string | | Path to label photo |
+| `status` | enum | ✓ | in_stock, used_up, donated, lost |
+| `order_id` | integer | | (Future) Link to Order |
+| `created_at` | datetime | auto | Creation timestamp |
+| `updated_at` | datetime | auto | Last update timestamp |
 
 ---
 
-## 6. Prompts for Tools
+## Project Structure
 
-### 6.1 Codx – Initial Onboarding Prompt
-
-Use this (or a trimmed version) when you start Codx on the repo:
-
-> You are Codx, the GitHub-aware code agent for the repository `feedmetaco/3D-filament-scanner-`.
->
-> Your primary source of truth is the file `PROJECT_PLAN.md`.  
-> Follow its architecture, data model, and phase breakdown exactly unless explicitly updated.
->
-> High-level responsibilities:
-> - Create and maintain a FastAPI + SQLite backend under `backend/`.
-> - Create and maintain a React frontend under `frontend/`.
-> - Implement v1 (products + spools, label photo OCR) and v1.1 (orders + invoice parsing) as described.
-> - Manage Docker integration so the app can run as a single stack on Synology.
-> - Keep code idiomatic, well-structured, and tested.
->
-> Do not invent new requirements or features beyond what’s in `PROJECT_PLAN.md` without explicit instructions.
-> When in doubt, add notes or TODO comments referencing the relevant section in `PROJECT_PLAN.md`.
-
----
-
-### 6.2 Cursor + Claude – Local Dev Prompt
-
-When working in Cursor, you can tell Claude something like:
-
-> You are my local dev assistant for the `3D-filament-scanner-` project.  
-> The authoritative spec is in `PROJECT_PLAN.md`.  
-> Codx is responsible for large repo-wide changes via GitHub; you are responsible for:
-> - Debugging build/runtime errors on my machine.
-> - Refining specific functions (e.g., label parsing, invoice parsing).
-> - Helping adjust UI components and layouts.
-> - Suggesting fixes when Docker or environment paths break.
->
-> Always read `PROJECT_PLAN.md` before making changes, and keep the implementation consistent with it.
+```
+3D-filament-scanner-/
+├── backend/
+│   ├── main.py          # FastAPI app and route handlers
+│   ├── models.py        # SQLModel data models
+│   ├── database.py      # Database engine and session management
+│   └── requirements.txt # Python dependencies
+├── tests/
+│   └── test_api.py      # API integration tests
+├── .github/
+│   └── workflows/
+│       └── ci.yml       # GitHub Actions CI pipeline
+├── railway.toml         # Railway deployment config
+├── Procfile             # Process definition for Railway
+├── .env.example         # Environment variable template
+├── CLAUDE.md            # Development guide for AI assistants
+└── README.md            # This file
+```
 
 ---
 
-### 6.3 ChatGPT – Planner Prompt (for future changes)
+## Technology Decisions
 
-When you want to extend or refactor this plan:
+### Why FastAPI?
+- Modern async Python framework
+- Automatic OpenAPI documentation
+- Type safety with Pydantic
+- High performance (comparable to Node.js/Go)
 
-> I have a project called 3D-filament-scanner-, with `PROJECT_PLAN.md` defining the architecture and phases.  
-> I want to update the plan to add/modify these features: [describe].  
-> Please produce an updated section or an add-on design that I can paste into the existing `PROJECT_PLAN.md`, keeping the same style and structure.
+### Why SQLModel?
+- Combines SQLAlchemy (ORM) + Pydantic (validation)
+- Single source of truth for data models
+- Type hints for IDE support
+- Easy migration between SQLite and PostgreSQL
+
+### Why PostgreSQL (Production)?
+- Railway provides free PostgreSQL instance
+- Production-grade reliability
+- Better for multi-user scenarios (vs SQLite)
+- Easy to scale when needed
+
+### Why SQLite (Local Dev)?
+- Zero configuration required
+- Perfect for single-user local development
+- Fast iteration and testing
+- Same codebase works with both databases
+
+---
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | `sqlite:///./backend/app.db` | Database connection string |
+| `PORT` | `8000` | Server port (set by Railway in production) |
+
+**Railway automatically sets:**
+- `DATABASE_URL` - PostgreSQL connection string
+- `PORT` - Dynamic port assignment
 
 ---
 
-## 7. Progress Tracking
+## Contributing
 
-Use checkboxes in this file or open GitHub Issues for each task group.  
-As you complete tasks, update the `[ ]` → `[x]` to keep Codx/Cursor aligned with reality.
+### Development Workflow
 
-This single document should be enough for:
+1. **Fork and clone** the repository
+2. **Create a branch** for your feature: `git checkout -b feature/my-feature`
+3. **Make changes** and add tests
+4. **Run tests** locally: `pytest`
+5. **Commit changes:** Follow conventional commits format
+6. **Push and create PR** to `main` branch
 
-- Codx to know what to build.
-- Cursor/Claude to know what to debug/refine.
-- You to know what to do on Synology.
-- ChatGPT to keep the overall design coherent.
+### Code Style
+- Follow existing patterns in `backend/main.py` and `backend/models.py`
+- Use type hints for all function signatures
+- Add docstrings for complex functions
+- Ensure tests pass before pushing
 
-
-## 4. Roles & Responsibilities
-
-This section defines who does what so tools don’t step on each other.
-
-We assume you are using:
-
-- **ChatGPT Codex** → ChatGPT with direct access to this GitHub repo (via the GitHub integration).
-- **Cursor + Claude** → your local editor/agent running on your dev machine.
-- **ChatGPT (regular)** → planning/architecture (this plan file).
-
-### 4.1 Sami (You)
-
-- Owns the **runtime environment**:
-  - Synology configuration.
-  - Docker installation / upgrades.
-  - Volume mounts & backups.
-- Runs and tests the app:
-  - Uses UI to add real filaments.
-  - Uploads label images / invoices.
-  - Reports parsing failures and weird behavior.
-- Makes **product/feature decisions**:
-  - When to expand features (QR codes, PWA, cloud migration, etc.).
-
-### 4.2 ChatGPT Codex (GitHub-connected ChatGPT)
-
-ChatGPT Codex is your **repo-aware coding agent**. It sees the GitHub repo and can commit/PR.
-
-It is responsible for **big, structured changes**:
-
-- Creating and maintaining **project structure**:
-  - `backend/` (FastAPI + SQLite + OCR).
-  - `frontend/` (React).
-  - Docker files (`Dockerfile`, `docker-compose.yml`).
-- Implementing major features:
-  - v1: `Product` + `Spool` models and CRUD.
-  - v1: `/api/spools/from-photo` endpoint with label OCR + parsing.
-  - v1.1: `Order` + `OrderItem` models and invoice parsing pipeline.
-- Writing/maintaining:
-  - API routes.
-  - ORM models & schema changes.
-  - Integration tests and unit tests for parsing logic.
-
-**Important:**  
-Whenever you start a “big change” session with ChatGPT Codex, tell it explicitly:
-
-> “Use `PROJECT_PLAN.md` as the source of truth. Stay within v1/v1.1 scope unless I say otherwise.”
-
-Codex should always respect `PROJECT_PLAN.md` as the spec.
-
-
-## 8. How ChatGPT Codex Must Work
-
-ChatGPT Codex (GitHub-connected ChatGPT) must treat this document as the **source of truth** and follow this workflow for every change:
-
-1. **Read the plan and tasks first**
-   - Before making changes, Codex must:
-     - Re-read the relevant sections of this README/PROJECT_PLAN.
-     - Locate the current phase (v1, v1.1, etc.).
-     - Identify the specific checklist items it is about to work on.
-
-2. **Validate work after coding**
-   - For each task it claims to complete, Codex must:
-     - Run appropriate checks (e.g., `pytest` for backend, `npm test`/`npm run build` for frontend) if feasible in the environment.
-     - Hit health endpoints or describe how to manually verify (e.g., "Open `/docs` and confirm endpoints X/Y are present").
-     - Summarize what it tested and any limitations (e.g., "could not run Docker here, please run `docker compose up` locally").
-
-3. **Update TODO lists and progress in this plan**
-   - After completing work, Codex must:
-     - Update the relevant checkboxes in this file from `[ ]` to `[x]` for tasks it has actually done.
-     - If it partially completes a task, add a short note (e.g., `// TODO: still need to wire frontend to endpoint`).
-     - If it creates new subtasks, add them as indented checklist items under the appropriate phase.
-
-4. **Maintain an explicit progress log**
-   - At the end of each larger change (e.g., PR or major commit), Codex should append or update a section:
-
-     ```markdown
-     ### Progress Log (Codex)
-
-     - 2025-11-30 – Implemented Phase 1 backend:
-       - Added `backend/` FastAPI app with Product + Spool models.
-       - Implemented CRUD endpoints for products and spools.
-       - Added pytest smoke tests and GitHub Actions CI.
-     ```
-
-   - This log should be brief but concrete: what was added, where it lives, and how to run it.
-
-5. **Define explicit next steps**
-
-   After each change, Codex must add/update a small “Next Steps” block:
-
-   ```markdown
-   ### Next Steps
-
-   **For Sami:**
-   - [ ] Pull latest `main`
-   - [ ] Run `uvicorn ...` to verify backend locally
-   - [ ] Hit `/docs` and create a test product + spool
-
-   **For Codex:**
-   - [ ] Start Phase 2 (frontend) once Sami confirms backend runs locally
-
-
-### 4.3 Cursor + Claude (local dev assistant)
-
-Cursor/Claude runs in your editor and has access to your **local workspace**, not GitHub directly.
-
-Use Cursor/Claude for:
-
-- **Local debugging**:
-  - Build failures, runtime errors on your Mac/PC.
-  - Path/permissions issues, missing libs, etc.
-- **Targeted edits**:
-  - Tweaking a single function (e.g., `parse_sunlu_label()`).
-  - Adjusting React components and CSS/layout.
-  - Small refactors that you want to see live while coding.
-- **Bridging environment gaps**:
-  - Helping adapt code from Codex to your local environment before you push.
-  - Verifying Docker runs on your machine before you move to Synology.
-
-Pattern to follow:
-
-1. Let **ChatGPT Codex** do the “big sweep” changes in GitHub.
-2. Pull changes locally.
-3. Use **Cursor/Claude** to fix local issues and polish.
-4. Commit/push back to GitHub.
-
-### 4.4 ChatGPT (Planner/Architect – this file)
-
-Use regular ChatGPT (no repo hookup) when you need:
-
-- New design decisions:
-  - Data model changes.
-  - Architectural choices (e.g., “Should I move to Supabase?”).
-- High-level plans:
-  - New phases (v2, PWA, QR codes, etc.).
-  - Updated implementation plans.
-- New documentation:
-  - Updated `PROJECT_PLAN.md`.
-  - Additional design docs for future features.
-
-When something big changes (e.g., you decide to add user auth, or cloud sync), come back here, ask ChatGPT to update the plan, then paste the new sections into `PROJECT_PLAN.md`. After that, **Codex and Cursor follow the updated spec.**
-
+### Testing
+- All new endpoints must have corresponding tests
+- Tests use in-memory SQLite database
+- Integration tests cover full request/response cycle
 
 ---
+
+## Troubleshooting
+
+### Railway Deployment Issues
+
+**Build Fails:**
+- Check Railway logs for specific error
+- Verify `requirements.txt` has all dependencies
+- Ensure Python version compatibility (3.11+)
+
+**Database Connection Errors:**
+- Verify PostgreSQL service is running in Railway
+- Check that `DATABASE_URL` is set (automatic in Railway)
+- Review connection pooling settings in `backend/database.py`
+
+**App Won't Start:**
+- Check that `PORT` environment variable is used
+- Verify Railway logs for startup errors
+- Test locally first with same configuration
+
+### Local Development Issues
+
+**Import Errors:**
+```bash
+# Activate virtual environment
+source venv/bin/activate
+
+# Reinstall dependencies
+pip install -r backend/requirements.txt
+```
+
+**Port Already in Use:**
+```bash
+# Find and kill process
+lsof -ti:8000 | xargs kill -9
+
+# Or use different port
+uvicorn backend.main:app --reload --port 8001
+```
+
+**Database Locked:**
+- Ensure only one server instance is running
+- Close any database browser connections
+- Delete `backend/app.db` and restart
+
+---
+
+## Roadmap
+
+### Phase 1: Core Backend ✅ (Complete)
+- Product and Spool CRUD API
+- PostgreSQL support for production
+- Railway deployment configuration
+- Automated testing and CI/CD
+
+### Phase 2: Frontend (Next)
+- React SPA with mobile-responsive UI
+- Product and spool management interface
+- Filtering and search functionality
+- Dashboard with inventory summary
+
+### Phase 3: Label Scanning
+- Tesseract OCR integration
+- Brand-specific label parsers (Sunlu, eSUN, Bambu)
+- Photo upload and automatic product detection
+- Mobile camera integration
+
+### Phase 4: Order Management
+- Invoice upload and parsing
+- Order tracking with line items
+- Automatic spool creation from orders
+- Price history and analytics
+
+### Phase 5: Advanced Features
+- Barcode/QR code scanning
+- Progressive Web App (PWA) support
+- Inventory alerts and reminders
+- Export functionality (CSV, Excel)
+
+---
+
+## License
+
+This project is open source and available under the MIT License.
+
+---
+
+## Support
+
+- **Issues:** [GitHub Issues](https://github.com/feedmetaco/3D-filament-scanner-/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/feedmetaco/3D-filament-scanner-/discussions)
+- **Documentation:** See `/docs` endpoint when server is running
+
+---
+
+## Acknowledgments
+
+Built with:
+- [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework
+- [SQLModel](https://sqlmodel.tiangolo.com/) - SQL database ORM with Python types
+- [Railway](https://railway.app/) - Infrastructure platform
+- [PostgreSQL](https://www.postgresql.org/) - Production database
+
+---
+
+**Ready to deploy?** Follow the [Railway Deployment Guide](#railway-deployment-guide) above to get started!
