@@ -66,11 +66,17 @@ class LabelParser:
     def detect_brand(text: str) -> Optional[str]:
         """Detect brand from OCR text."""
         text_lower = text.lower()
-        if "esun" in text_lower or "e sun" in text_lower:
+        # Remove spaces for better matching
+        text_no_space = text_lower.replace(" ", "").replace("\n", "")
+
+        # eSUN variations
+        if "esun" in text_no_space or "e-sun" in text_lower or "e sun" in text_lower:
             return "esun"
-        elif "sunlu" in text_lower:
+        # Sunlu
+        elif "sunlu" in text_no_space:
             return "sunlu"
-        elif "bambu" in text_lower or "bambulab" in text_lower:
+        # Bambu Lab
+        elif "bambu" in text_no_space or "bambulab" in text_no_space:
             return "bambu"
         return None
 
@@ -120,6 +126,7 @@ class LabelParser:
         }
 
         # Material
+        # First try standard pattern
         material_match = re.search(patterns["material"], text, re.IGNORECASE)
         if material_match:
             # Normalize material name (remove hyphens, standardize spacing)
@@ -127,11 +134,33 @@ class LabelParser:
             material = material.replace("-", " ")  # Convert hyphens to spaces
             material = " ".join(material.split())  # Normalize whitespace
             result["material"] = material
+        else:
+            # Fallback: look for common material names anywhere in text
+            text_upper = text.upper()
+            if "PLA+" in text_upper or "PLA +" in text_upper:
+                result["material"] = "PLA+"
+            elif "PLA" in text_upper:
+                result["material"] = "PLA"
+            elif "PETG" in text_upper:
+                result["material"] = "PETG"
+            elif "ABS" in text_upper:
+                result["material"] = "ABS"
+            elif "TPU" in text_upper:
+                result["material"] = "TPU"
 
         # Color
         color_match = re.search(patterns["color"], text, re.IGNORECASE)
         if color_match:
             result["color_name"] = color_match.group(1).title()
+        else:
+            # Fallback: search for common colors anywhere in text
+            common_colors = ["White", "Black", "Red", "Blue", "Green", "Yellow",
+                           "Orange", "Purple", "Grey", "Gray", "Silver", "Gold",
+                           "Pink", "Brown", "Natural", "Transparent"]
+            for color in common_colors:
+                if re.search(r'\b' + color + r'\b', text, re.IGNORECASE):
+                    result["color_name"] = color
+                    break
 
         # Diameter
         diameter_match = re.search(patterns["diameter"], text)
