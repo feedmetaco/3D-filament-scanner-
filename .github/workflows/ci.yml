@@ -16,7 +16,12 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr tesseract-ocr-eng
+
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r backend/requirements.txt
