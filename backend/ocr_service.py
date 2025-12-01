@@ -11,22 +11,22 @@ class LabelParser:
     BRAND_PATTERNS = {
         "esun": {
             "identifier": r"e(SUN|sun)",
-            "material": r"(PLA\+|PLA|ABS|PETG|TPU)(?:\s+filament)?",
-            "color": r"(?:Printers,?\s+|,\s+)?(White|Black|Red|Blue|Green|Yellow|Orange|Purple|Grey|Gray|Transparent|Natural|[A-Z][a-z]+)",
+            "material": r"(PLA\+|PLA|ABS|PETG|TPU)",
+            "color": r"(?:Printers,?\s+|,\s+)?(White|Black|Red|Blue|Green|Yellow|Orange|Purple|Grey|Gray|Transparent|Natural|Silver|Gold|Pink|Brown|Cyan|Magenta|[A-Z][a-z]+)",
             "diameter": r"(1\.75|2\.85|3\.0)[\s]?mm",
             "barcode": r"X0[A-Z0-9IO]{2}[A-Z0-9IO]{2}[A-Z0-9IO]{4}"
         },
         "sunlu": {
             "identifier": r"SUNLU",
-            "material": r"(SILK\s+PLA|PLA\+?|ABS|PETG|TPU)",
-            "color": r"(Yellow|Red|Blue|Green|White|Black|Orange|Purple|Grey|Gray|[A-Z][a-z]+)",
+            "material": r"(SILK[\s]+PLA|PLA\+|PLA|ABS|PETG|TPU)",
+            "color": r"(White|Black|Red|Blue|Green|Yellow|Orange|Purple|Grey|Gray|Silver|Gold|Pink|Brown|Cyan|Magenta|[A-Z][a-z]+)",
             "diameter": r"(1\.75|2\.85|3\.0)[\s]?mm",
             "barcode": r"X[0-9]{4}[A-Z0-9]{6}"
         },
         "bambu": {
             "identifier": r"Bambu[\s]*Lab",
-            "material": r"(PETG[\s]?HF|PETG|PLA[\s]?Basic|PLA[\s]?Matte|PLA[\s]?Silk|PLA|ABS|TPU)",
-            "color": r"(?:Black|White|Red|Blue|Green|Yellow|Orange|Purple|Grey|Gray|Natural|Transparent|[A-Z][a-z]+)",
+            "material": r"(PETG[\s-]?HF|PETG|PLA[\s-]?Basic|PLA[\s-]?Matte|PLA[\s-]?Silk|PLA|ABS|TPU)",
+            "color": r"(Black|White|Red|Blue|Green|Yellow|Orange|Purple|Grey|Gray|Natural|Transparent|Silver|Gold|Pink|Brown|Cyan|Magenta|[A-Z][a-z]+)",
             "diameter": r"(1\.75|2\.85|3\.0)[\s]?mm",
             "barcode": None  # Bambu uses QR codes
         }
@@ -99,10 +99,14 @@ class LabelParser:
         # Material
         material_match = re.search(patterns["material"], text, re.IGNORECASE)
         if material_match:
-            result["material"] = material_match.group(1).upper()
+            # Normalize material name (remove hyphens, standardize spacing)
+            material = material_match.group(1).upper()
+            material = material.replace("-", " ")  # Convert hyphens to spaces
+            material = " ".join(material.split())  # Normalize whitespace
+            result["material"] = material
 
         # Color
-        color_match = re.search(patterns["color"], text)
+        color_match = re.search(patterns["color"], text, re.IGNORECASE)
         if color_match:
             result["color_name"] = color_match.group(1).title()
 
