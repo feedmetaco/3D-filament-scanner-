@@ -16,5 +16,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend ./backend
 COPY requirements.txt .
 
-# Railway will set $PORT, use shell form to expand variable
-CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Copy and make start script executable
+COPY backend/start.sh .
+RUN chmod +x start.sh
+
+# Use start script to properly expand PORT variable
+CMD ["./start.sh"]
