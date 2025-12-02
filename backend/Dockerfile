@@ -1,9 +1,10 @@
 FROM python:3.11-slim
 
-# Install Tesseract OCR
+# Install Tesseract OCR with English and Chinese support
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     tesseract-ocr-eng \
+    tesseract-ocr-chi-sim \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

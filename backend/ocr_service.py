@@ -16,6 +16,27 @@ class OCRError(Exception):
 class LabelParser:
     """Parse filament box labels using OCR and brand-specific patterns."""
 
+    # Chinese to English color name mappings (for Bambu Lab labels)
+    CHINESE_COLOR_MAP = {
+        "黑色": "Black",
+        "白色": "White",
+        "红色": "Red",
+        "蓝色": "Blue",
+        "绿色": "Green",
+        "黄色": "Yellow",
+        "橙色": "Orange",
+        "紫色": "Purple",
+        "灰色": "Grey",
+        "银色": "Silver",
+        "金色": "Gold",
+        "粉色": "Pink",
+        "棕色": "Brown",
+        "自然色": "Natural",
+        "透明": "Transparent",
+        "青色": "Cyan",
+        "洋红色": "Magenta",
+    }
+
     BRAND_PATTERNS = {
         "esun": {
             "identifier": r"e(SUN|sun)",
@@ -33,9 +54,9 @@ class LabelParser:
         },
         "bambu": {
             "identifier": r"Bambu[\s]*Lab",
-            "material": r"(PETG[\s-]?HF|PETG|PLA[\s-]?Basic|PLA[\s-]?Matte|PLA[\s-]?Silk|PLA|ABS|TPU)",
+            "material": r"(PETG[\s-]?HF|PETG|PLA[\s-]?Basic|PLA[\s-]?Matte|PLA[\s-]?Silk|PLA|ABS|TPU|ASA)",
             "color": r"(Black|White|Red|Blue|Green|Yellow|Orange|Purple|Grey|Gray|Natural|Transparent|Silver|Gold|Pink|Brown|Cyan|Magenta|[A-Z][a-z]+)",
-            "diameter": r"(1\.75|2\.85|3\.0)[\s]?mm",
+            "diameter": r"(1\.75|2\.85|3\.0)[\s]?mm|(1\.75|2\.85|3\.0)[\s]?毫米",  # Support both mm and Chinese 毫米
             "barcode": None  # Bambu uses QR codes
         }
     }
@@ -155,14 +176,19 @@ class LabelParser:
         return img
 
     @staticmethod
-    def _run_ocr_with_config(img: Image.Image, psm: int) -> Tuple[str, float]:
+    def _run_ocr_with_config(img: Image.Image, psm: int, lang: str = 'eng+chi_sim') -> Tuple[str, float]:
         """
         Run OCR with specific PSM mode and return text with confidence.
+        
+        Args:
+            img: Preprocessed image
+            psm: Page Segmentation Mode
+            lang: Language(s) to use (default: 'eng+chi_sim' for English + Chinese)
         
         Returns:
             Tuple of (text, average_confidence)
         """
-        config = f'--oem 3 --psm {psm}'
+        config = f'--oem 3 --psm {psm} -l {lang}'
         try:
             # Get detailed data including confidence
             data = pytesseract.image_to_data(img, config=config, output_type=pytesseract.Output.DICT)
@@ -242,10 +268,10 @@ class LabelParser:
             logger.info(f"Best OCR result: confidence {best_confidence:.1f}% using {best_strategy} PSM{best_psm}")
             return best_text, f"{best_strategy}_psm{best_psm}"
         else:
-            # Last resort: try original image with default settings
+            # Last resort: try original image with default settings (English + Chinese)
             try:
                 img = LabelParser._preprocess_basic(original_img)
-                text = pytesseract.image_to_string(img, config='--oem 3 --psm 3')
+                text = pytesseract.image_to_string(img, config='--oem 3 --psm 3 -l eng+chi_sim')
                 return text, "fallback"
             except Exception as e:
                 raise OCRError(f"All OCR strategies failed. Last error: {str(e)}")
@@ -366,15 +392,23 @@ class LabelParser:
                     result["material"] = "TPU"
 
             # Color
-            # Try common color word search first (more reliable than regex patterns)
-            common_colors = ["White", "Black", "Red", "Blue", "Green", "Yellow",
-                           "Orange", "Purple", "Grey", "Gray", "Silver", "Gold",
-                           "Pink", "Brown", "Natural", "Transparent", "Cyan", "Magenta"]
+            # First, check for Chinese color names (for Bambu Lab labels)
+            if brand == "bambu":
+                for chinese_color, english_color in LabelParser.CHINESE_COLOR_MAP.items():
+                    if chinese_color in text:
+                        result["color_name"] = english_color
+                        break
 
-            for color in common_colors:
-                if re.search(r'\b' + color + r'\b', text, re.IGNORECASE):
-                    result["color_name"] = color
-                    break
+            # Try common English color word search (more reliable than regex patterns)
+            if not result["color_name"]:
+                common_colors = ["White", "Black", "Red", "Blue", "Green", "Yellow",
+                               "Orange", "Purple", "Grey", "Gray", "Silver", "Gold",
+                               "Pink", "Brown", "Natural", "Transparent", "Cyan", "Magenta"]
+
+                for color in common_colors:
+                    if re.search(r'\b' + color + r'\b', text, re.IGNORECASE):
+                        result["color_name"] = color
+                        break
 
             # If no common color found, try brand-specific pattern
             if not result["color_name"]:
@@ -398,7 +432,16 @@ class LabelParser:
             # Diameter
             diameter_match = re.search(patterns["diameter"], text)
             if diameter_match:
-                result["diameter_mm"] = float(diameter_match.group(1))
+                # Try group 1 first (mm format), then group 2 (Chinese format)
+                diameter_str = diameter_match.group(1) or diameter_match.group(2)
+                if diameter_str:
+                    result["diameter_mm"] = float(diameter_str)
+            else:
+                # Fallback: look for diameter anywhere in text (handles Chinese labels)
+                # Pattern: number followed by mm or 毫米
+                fallback_diameter = re.search(r'(1\.75|2\.85|3\.0)[\s]*(?:mm|毫米)', text, re.IGNORECASE)
+                if fallback_diameter:
+                    result["diameter_mm"] = float(fallback_diameter.group(1))
 
             # Barcode (if pattern exists)
             if patterns["barcode"]:
