@@ -1,0 +1,13 @@
+frontend/
+*.md
+*.pdf
+*.JPG
+*.DNG
+scripts/
+tests/
+venv/
+__pycache__/
+*.pyc
+.env
+.env.local
+

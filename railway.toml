@@ -1,7 +1,9 @@
 [build]
 builder = "dockerfile"
 dockerfilePath = "backend/Dockerfile"
+watchPatterns = ["backend/**", "*.toml", "*.txt"]
 
 [deploy]
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
+startCommand = "./start.sh"
