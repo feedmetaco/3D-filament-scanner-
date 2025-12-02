@@ -58,6 +58,13 @@ class LabelParser:
             "color": r"(Black|White|Red|Blue|Green|Yellow|Orange|Purple|Grey|Gray|Natural|Transparent|Silver|Gold|Pink|Brown|Cyan|Magenta|[A-Z][a-z]+)",
             "diameter": r"(1\.75|2\.85|3\.0)[\s]?mm|(1\.75|2\.85|3\.0)[\s]?毫米",  # Support both mm and Chinese 毫米
             "barcode": None  # Bambu uses QR codes
+        },
+        "jayo": {
+            "identifier": r"JAYO",
+            "material": r"(PETG|PLA\+|PLA|ABS|TPU)",
+            "color": r"(Black|White|Red|Blue|Green|Yellow|Orange|Purple|Grey|Gray|Natural|Transparent|Silver|Gold|Pink|Brown|Cyan|Magenta|Olive|Olve|[A-Z][a-z]+)",
+            "diameter": r"(1\.75|2\.85|3\.0)[\s]?mm|(1\.75|2\.85|3\.0)[\s]?毫米",
+            "barcode": None
         }
     }
 
@@ -320,17 +327,40 @@ class LabelParser:
         text_no_space = text_lower.replace(" ", "").replace("\n", "").replace("-", "").replace("_", "")
 
         # Bambu Lab - check first (before eSUN) since "Lab" might be misread
-        # Also check for common OCR mistakes: "Bambu" might be read as "Bambu", "Bam bu", "Bambulab", etc.
-        if ("bambu" in text_no_space or "bambulab" in text_no_space or 
-            "bambu lab" in text_lower or "bam bu" in text_lower or
-            "bambu" in text_lower):
+        # Also check for common OCR mistakes: "Bambu" might be read as "Hifé", "Bam bu", "Bambulab", etc.
+        # Look for patterns that indicate Bambu Lab labels:
+        # - "Hifé" is often OCR misreading "Bambu"
+        # - Temperature range 230-260°C is common for Bambu Lab
+        # - "Made in China" with filament specs
+        # - Diameter specs with specific format
+        bambu_indicators = [
+            "bambu" in text_no_space,
+            "bambulab" in text_no_space,
+            "bambu lab" in text_lower,
+            "bam bu" in text_lower,
+            # OCR misreading "Bambu" as "Hifé"
+            ("hifé" in text_lower or "hife" in text_lower) and 
+            ("230" in text_lower or "260" in text_lower) and
+            ("made in china" in text_lower or "made in" in text_lower),
+            # Pattern matching: temperature range + diameter + made in china
+            ("230" in text_lower and "260" in text_lower and 
+             ("1.75" in text_lower or "1,75" in text_lower or "diameter" in text_lower) and
+             ("made in china" in text_lower or "filament" in text_lower))
+        ]
+        
+        if any(bambu_indicators):
             return "bambu"
         # eSUN variations
         elif ("esun" in text_no_space or "e-sun" in text_lower or 
               "e sun" in text_lower or "e.sun" in text_lower):
             return "esun"
+        # JAYO - check for JAYO brand (often misread as "Ty JAYO" or "JAYOPETG")
+        elif ("jayo" in text_no_space or "jayo" in text_lower or
+              "jayopetg" in text_no_space or "ty jayo" in text_lower):
+            return "jayo"
         # Sunlu
-        elif "sunlu" in text_no_space or "sun lu" in text_lower:
+        elif ("sunlu" in text_no_space or "sun lu" in text_lower or
+              "sunluplasd" in text_no_space):
             return "sunlu"
         return None
 
@@ -389,7 +419,8 @@ class LabelParser:
             brand_names = {
                 "esun": "eSUN",
                 "sunlu": "Sunlu",
-                "bambu": "Bambu Lab"
+                "bambu": "Bambu Lab",
+                "jayo": "JAYO"
             }
             result = {
                 "brand": brand_names.get(brand, brand.title()),
@@ -414,19 +445,42 @@ class LabelParser:
             else:
                 # Fallback: look for common material names anywhere in text
                 text_upper = text.upper()
+                
+                # For Bambu Lab: Check Filament Code patterns
+                # Filament codes often indicate material type
+                if brand == "bambu":
+                    filament_code_match = re.search(r'(?:Filament Code|Code)[\s:]*(\d+)', text, re.IGNORECASE)
+                    if filament_code_match:
+                        code = filament_code_match.group(1)
+                        # Bambu Lab filament code patterns:
+                        # PLA codes often start with 1, PETG with 2, TPU with 5, etc.
+                        if code.startswith('1'):
+                            result["material"] = "PLA"
+                        elif code.startswith('2'):
+                            result["material"] = "PETG"
+                        elif code.startswith('5'):
+                            result["material"] = "TPU"
+                        elif code.startswith('3'):
+                            result["material"] = "ABS"
+                
                 # Check compound materials first (PETG HF before PETG, PLA+ before PLA)
-                if "PETG HF" in text_upper or "PETGHF" in text_upper or "PETG-HF" in text_upper:
-                    result["material"] = "PETG HF"
-                elif "PLA+" in text_upper or "PLA +" in text_upper or "PLA PLUS" in text_upper:
-                    result["material"] = "PLA+"
-                elif "PETG" in text_upper:
-                    result["material"] = "PETG"
-                elif "PLA" in text_upper:
+                if not result["material"]:
+                    if "PETG HF" in text_upper or "PETGHF" in text_upper or "PETG-HF" in text_upper:
+                        result["material"] = "PETG HF"
+                    elif "PLA+" in text_upper or "PLA +" in text_upper or "PLA PLUS" in text_upper:
+                        result["material"] = "PLA+"
+                    elif "PETG" in text_upper:
+                        result["material"] = "PETG"
+                    elif "PLA" in text_upper:
+                        result["material"] = "PLA"
+                    elif "ABS" in text_upper:
+                        result["material"] = "ABS"
+                    elif "TPU" in text_upper:
+                        result["material"] = "TPU"
+                
+                # For Bambu Lab: Default to PLA if no material found (most common)
+                if brand == "bambu" and not result["material"]:
                     result["material"] = "PLA"
-                elif "ABS" in text_upper:
-                    result["material"] = "ABS"
-                elif "TPU" in text_upper:
-                    result["material"] = "TPU"
 
             # Color
             # First, check for Chinese color names (for Bambu Lab labels)
@@ -438,15 +492,38 @@ class LabelParser:
 
             # Try common English color word search (more reliable than regex patterns)
             if not result["color_name"]:
+                # Map OCR misreadings to correct color names
+                color_corrections = {
+                    "yelow": "Yellow",
+                    "yellw": "Yellow",
+                    "yello": "Yellow",
+                    "olve": "Olive",
+                    "oliv": "Olive",
+                    "gren": "Green",
+                    "grene": "Green",
+                    "blak": "Black",
+                    "whit": "White",
+                    "whte": "White"
+                }
+                
                 common_colors = ["White", "Black", "Red", "Blue", "Green", "Yellow",
                                "Orange", "Purple", "Grey", "Gray", "Silver", "Gold",
-                               "Pink", "Brown", "Natural", "Transparent", "Cyan", "Magenta"]
+                               "Pink", "Brown", "Natural", "Transparent", "Cyan", "Magenta", "Olive"]
 
-                for color in common_colors:
-                    # Look for color as whole word (case insensitive)
-                    if re.search(r'\b' + re.escape(color) + r'\b', text, re.IGNORECASE):
-                        result["color_name"] = color
+                # First check for OCR misreadings
+                text_lower = text.lower()
+                for misread, correct in color_corrections.items():
+                    if misread in text_lower:
+                        result["color_name"] = correct
                         break
+                
+                # Then check for standard color names
+                if not result["color_name"]:
+                    for color in common_colors:
+                        # Look for color as whole word (case insensitive)
+                        if re.search(r'\b' + re.escape(color) + r'\b', text, re.IGNORECASE):
+                            result["color_name"] = color
+                            break
                 
                 # For Bambu Lab, also check after "With Spool" or near color indicators
                 if brand == "bambu" and not result["color_name"]:
@@ -489,6 +566,49 @@ class LabelParser:
                 fallback_diameter = re.search(r'(1\.75|2\.85|3\.0)[\s]*(?:mm|毫米)', text, re.IGNORECASE)
                 if fallback_diameter:
                     result["diameter_mm"] = float(fallback_diameter.group(1))
+                else:
+                    # Handle OCR misreadings: "{75mm" → "1.75mm", "175mm" → "1.75mm"
+                    # Pattern: look for "75mm" or "85mm" preceded by {, [, or similar
+                    misread_diameter = re.search(r'[{\[]?\s*75\s*mm|175\s*mm|1\s*\.\s*75\s*mm', text, re.IGNORECASE)
+                    if misread_diameter:
+                        result["diameter_mm"] = 1.75
+                    else:
+                        misread_diameter_285 = re.search(r'[{\[]?\s*85\s*mm|285\s*mm|2\s*\.\s*85\s*mm', text, re.IGNORECASE)
+                        if misread_diameter_285:
+                            result["diameter_mm"] = 2.85
+                        else:
+                            # For Bambu Lab: Handle OCR misreadings (4.75 → 1.75, 4.85 → 2.85)
+                            # Look for "(Diameter)" pattern which is common on Bambu labels
+                            diameter_section = re.search(r'\(Diameter\)\s*([0-9.]+)', text, re.IGNORECASE)
+                            if diameter_section:
+                                diameter_value = float(diameter_section.group(1))
+                                
+                                # Fix common OCR misreadings
+                                # OCR often misreads "1" as "4" - so 4.75 is almost certainly 1.75
+                                # Also handles 4.85 → 2.85, 4.0 → 1.75, etc.
+                                if 4.0 <= diameter_value <= 5.0:
+                                    # This is likely a misread "1" → "4"
+                                    # Check if it's closer to 1.75 or 2.85
+                                    if abs(diameter_value - 4.75) < 0.5:  # 4.75 → 1.75
+                                        result["diameter_mm"] = 1.75
+                                    elif abs(diameter_value - 4.85) < 0.5:  # 4.85 → 2.85
+                                        result["diameter_mm"] = 2.85
+                                    else:
+                                        # Default to 1.75mm for Bambu (most common)
+                                        result["diameter_mm"] = 1.75
+                                elif diameter_value in [1.75, 2.85, 3.0]:
+                                    result["diameter_mm"] = diameter_value
+                                else:
+                                    # For other values, find closest standard
+                                    standard_diameters = [1.75, 2.85, 3.0]
+                                    closest = min(standard_diameters, key=lambda x: abs(diameter_value - x))
+                                    if abs(diameter_value - closest) < 0.5:  # Within 0.5mm
+                                        result["diameter_mm"] = closest
+                            
+                            # Also check for standard Bambu diameter (almost always 1.75mm)
+                            if brand == "bambu" and not result["diameter_mm"]:
+                                # Bambu Lab standard is 1.75mm unless specified otherwise
+                                result["diameter_mm"] = 1.75
 
             # Barcode (if pattern exists)
             if patterns["barcode"]:

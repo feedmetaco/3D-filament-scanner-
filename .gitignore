@@ -50,3 +50,8 @@ dist/
 build/
 *.egg-info/
 
+
+# Secrets
+*.json
+service-account.json
+filament-scanner-*.json
