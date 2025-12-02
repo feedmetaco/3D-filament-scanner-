@@ -207,10 +207,38 @@ class LabelParser:
             
             return text, avg_confidence
         except Exception as e:
-            logger.warning(f"OCR failed with PSM {psm}: {e}")
-            # Fallback to simple text extraction
-            text = pytesseract.image_to_string(img, config=config)
-            return text, 0.0
+            error_msg = str(e).lower()
+            # If Chinese language not available, fallback to English only
+            if 'chi_sim' in lang and ('error' in error_msg or 'not found' in error_msg or 'unable' in error_msg):
+                logger.warning(f"Chinese language not available, falling back to English only. Error: {e}")
+                config_eng = f'--oem 3 --psm {psm} -l eng'
+                try:
+                    data = pytesseract.image_to_data(img, config=config_eng, output_type=pytesseract.Output.DICT)
+                    text_parts = []
+                    confidences = []
+                    for i, conf in enumerate(data['conf']):
+                        if int(conf) > 0:
+                            text_parts.append(data['text'][i])
+                            confidences.append(float(conf))
+                    text = ' '.join(text_parts).strip()
+                    avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+                    return text, avg_confidence
+                except Exception as e2:
+                    logger.warning(f"OCR failed with English fallback PSM {psm}: {e2}")
+                    text = pytesseract.image_to_string(img, config=config_eng)
+                    return text, 0.0
+            else:
+                logger.warning(f"OCR failed with PSM {psm}: {e}")
+                # Fallback to simple text extraction
+                try:
+                    text = pytesseract.image_to_string(img, config=config)
+                    return text, 0.0
+                except Exception as e2:
+                    # Last resort: try English only
+                    logger.warning(f"Final fallback to English only: {e2}")
+                    config_eng = f'--oem 3 --psm {psm} -l eng'
+                    text = pytesseract.image_to_string(img, config=config_eng)
+                    return text, 0.0
 
     @staticmethod
     def _extract_text_multiple_strategies(image_bytes: bytes) -> Tuple[str, str]:
@@ -268,11 +296,16 @@ class LabelParser:
             logger.info(f"Best OCR result: confidence {best_confidence:.1f}% using {best_strategy} PSM{best_psm}")
             return best_text, f"{best_strategy}_psm{best_psm}"
         else:
-            # Last resort: try original image with default settings (English + Chinese)
+            # Last resort: try original image with default settings (English + Chinese, fallback to English)
             try:
                 img = LabelParser._preprocess_basic(original_img)
-                text = pytesseract.image_to_string(img, config='--oem 3 --psm 3 -l eng+chi_sim')
-                return text, "fallback"
+                try:
+                    text = pytesseract.image_to_string(img, config='--oem 3 --psm 3 -l eng+chi_sim')
+                    return text, "fallback"
+                except Exception:
+                    # Fallback to English only if Chinese not available
+                    text = pytesseract.image_to_string(img, config='--oem 3 --psm 3 -l eng')
+                    return text, "fallback_eng"
             except Exception as e:
                 raise OCRError(f"All OCR strategies failed. Last error: {str(e)}")
 
@@ -283,17 +316,21 @@ class LabelParser:
             return None
             
         text_lower = text.lower()
-        # Remove spaces for better matching
-        text_no_space = text_lower.replace(" ", "").replace("\n", "")
+        # Remove spaces and special characters for better matching
+        text_no_space = text_lower.replace(" ", "").replace("\n", "").replace("-", "").replace("_", "")
 
         # Bambu Lab - check first (before eSUN) since "Lab" might be misread
-        if "bambu" in text_no_space or "bambulab" in text_no_space or "bambu lab" in text_lower:
+        # Also check for common OCR mistakes: "Bambu" might be read as "Bambu", "Bam bu", "Bambulab", etc.
+        if ("bambu" in text_no_space or "bambulab" in text_no_space or 
+            "bambu lab" in text_lower or "bam bu" in text_lower or
+            "bambu" in text_lower):
             return "bambu"
         # eSUN variations
-        elif "esun" in text_no_space or "e-sun" in text_lower or "e sun" in text_lower:
+        elif ("esun" in text_no_space or "e-sun" in text_lower or 
+              "e sun" in text_lower or "e.sun" in text_lower):
             return "esun"
         # Sunlu
-        elif "sunlu" in text_no_space:
+        elif "sunlu" in text_no_space or "sun lu" in text_lower:
             return "sunlu"
         return None
 
@@ -406,9 +443,19 @@ class LabelParser:
                                "Pink", "Brown", "Natural", "Transparent", "Cyan", "Magenta"]
 
                 for color in common_colors:
-                    if re.search(r'\b' + color + r'\b', text, re.IGNORECASE):
+                    # Look for color as whole word (case insensitive)
+                    if re.search(r'\b' + re.escape(color) + r'\b', text, re.IGNORECASE):
                         result["color_name"] = color
                         break
+                
+                # For Bambu Lab, also check after "With Spool" or near color indicators
+                if brand == "bambu" and not result["color_name"]:
+                    # Look for pattern like "With Spool" followed by color
+                    spool_color_match = re.search(r'(?:With\s+Spool|Spool)[\s:]+([A-Z][a-z]+)', text, re.IGNORECASE)
+                    if spool_color_match:
+                        potential_color = spool_color_match.group(1)
+                        if potential_color in common_colors:
+                            result["color_name"] = potential_color
 
             # If no common color found, try brand-specific pattern
             if not result["color_name"]:
