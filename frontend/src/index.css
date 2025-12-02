@@ -1,34 +1,94 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: 'Rajdhani', sans-serif;
+  --font-mono: 'Share Tech Mono', monospace;
 
-  --color-background: #f8fafc;
-  --color-primary: #3b82f6;
-  --color-secondary: #8b5cf6;
+  --color-bg: #050505;
+  --color-surface: #0a0f14;
+  --color-surfaceHighlight: #121820;
+  --color-primary: #00f0ff;
+  --color-secondary: #ff003c;
+  --color-tertiary: #fcee0a;
+  --color-text: #e0e0e0;
+  --color-muted: #5f6c7b;
+  
+  --shadow-neon-blue: 0 0 5px #00f0ff, 0 0 10px #00f0ff, 0 0 20px rgba(0, 240, 255, 0.5);
+  --shadow-neon-red: 0 0 5px #ff003c, 0 0 10px #ff003c, 0 0 20px rgba(255, 0, 60, 0.5);
 }
 
 @layer utilities {
-  .glass {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+  .bg-grid {
+    background-size: 40px 40px;
+    background-image: linear-gradient(to right, #1f2937 1px, transparent 1px), linear-gradient(to bottom, #1f2937 1px, transparent 1px);
+    mask-image: linear-gradient(to bottom, transparent, black, transparent);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 5%, black 40%, black 80%, transparent 95%);
   }
 
-  .animate-in {
-    animation: slideIn 0.3s ease-out;
+  .clip-corner {
+    clip-path: polygon(
+        0 0, 
+        100% 0, 
+        100% calc(100% - 12px), 
+        calc(100% - 12px) 100%, 
+        0 100%
+    );
+  }
+  
+  .clip-corner-top-right {
+    clip-path: polygon(
+        0 0, 
+        calc(100% - 20px) 0, 
+        100% 20px, 
+        100% 100%, 
+        0 100%
+    );
   }
 
-  @keyframes slideIn {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+  .animate-pulse-glow {
+    animation: pulse-glow 2s infinite;
   }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.8; box-shadow: 0 0 5px #00f0ff; }
+  50% { opacity: 1; box-shadow: 0 0 15px #00f0ff; }
+}
+
+body {
+  @apply bg-bg text-text overflow-x-hidden antialiased;
+}
+
+/* CRT Effect Overlay */
+.crt::before {
+  content: " ";
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  z-index: 50;
+  background-size: 100% 2px, 3px 100%;
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-surface;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-primary/30 rounded;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-primary/50;
 }

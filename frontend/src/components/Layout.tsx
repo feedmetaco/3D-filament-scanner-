@@ -11,53 +11,84 @@ export default function Layout({ children }: LayoutProps) {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <div className="min-h-screen pb-24">
-      {/* Floating Header */}
-      <header className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-md">
-        <div className="glass rounded-3xl shadow-2xl shadow-purple-500/10 p-1">
-          <div className="flex items-center justify-between px-4 py-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-                </svg>
-              </div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Filament
-              </h1>
-            </div>
-            <div className="flex gap-1">
-              <Link
-                to="/scanner"
-                className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all ${
-                  isActive('/scanner')
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg shadow-purple-500/30'
-                    : 'text-slate-600 hover:bg-white/50'
-                }`}
-              >
-                Scan
-              </Link>
-              <Link
-                to="/inventory"
-                className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all ${
-                  isActive('/inventory')
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg shadow-purple-500/30'
-                    : 'text-slate-600 hover:bg-white/50'
-                }`}
-              >
-                Stock
-              </Link>
+    <div className="min-h-screen font-sans text-text selection:bg-primary selection:text-black relative overflow-hidden">
+      
+      {/* Background Elements */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-grid opacity-[0.03] h-full w-full"></div>
+        {/* Ambient Glows */}
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-900/10 blur-[100px]"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-purple-900/10 blur-[100px]"></div>
+      </div>
+
+      {/* CRT Overlay */}
+      <div className="crt"></div>
+
+      <div className="relative z-10 max-w-md mx-auto min-h-screen flex flex-col pb-24">
+        
+        {/* Header / Status Bar */}
+        <header className="pt-6 px-4 mb-6 flex justify-between items-end">
+          <div>
+            <h1 className="text-3xl font-bold tracking-wider uppercase text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">
+              Fila<span className="text-primary">Scan</span>
+            </h1>
+            <div className="flex items-center gap-2 text-xs font-mono text-primary/70">
+              <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+              SYSTEM ONLINE
             </div>
           </div>
-        </div>
-      </header>
+          <div className="text-right hidden sm:block">
+             <div className="text-xs font-mono text-muted">USER: ADMIN</div>
+             <div className="text-xs font-mono text-muted">ID: 001-TX</div>
+          </div>
+        </header>
 
-      {/* Main Content with top padding for floating header */}
-      <main className="pt-28 px-4 max-w-md mx-auto">
-        <div className="animate-in">
+        {/* Main Content */}
+        <main className="flex-1 px-4 space-y-6 animate-in">
           {children}
-        </div>
-      </main>
+        </main>
+
+        {/* Bottom Navigation */}
+        <nav className="fixed bottom-0 left-0 right-0 bg-surface/90 backdrop-blur-md border-t border-white/10 z-40 pb-safe">
+          <div className="flex justify-around items-center h-16 max-w-md mx-auto">
+            <Link 
+              to="/scanner" 
+              className={`flex flex-col items-center gap-1 p-2 group relative transition-colors ${isActive('/scanner') ? 'text-primary' : 'text-muted hover:text-white'}`}
+            >
+              {isActive('/scanner') && (
+                <div className="absolute -top-[1px] left-0 right-0 h-[2px] bg-primary shadow-[0_0_10px_#00f0ff]"></div>
+              )}
+              <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${isActive('/scanner') ? 'drop-shadow-[0_0_5px_#00f0ff]' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span className="text-[10px] font-mono font-bold tracking-wider">SCAN</span>
+            </Link>
+
+            <Link 
+              to="/inventory" 
+              className={`flex flex-col items-center gap-1 p-2 group relative transition-colors ${isActive('/inventory') ? 'text-primary' : 'text-muted hover:text-white'}`}
+            >
+              {isActive('/inventory') && (
+                <div className="absolute -top-[1px] left-0 right-0 h-[2px] bg-primary shadow-[0_0_10px_#00f0ff]"></div>
+              )}
+              <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${isActive('/inventory') ? 'drop-shadow-[0_0_5px_#00f0ff]' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+              <span className="text-[10px] font-mono font-bold tracking-wider">STOCK</span>
+            </Link>
+
+            {/* Placeholder for Config/Future */}
+            <a href="#" className="flex flex-col items-center gap-1 p-2 text-muted/50 cursor-not-allowed">
+               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span className="text-[10px] font-mono font-bold tracking-wider">CONFIG</span>
+            </a>
+          </div>
+        </nav>
+      </div>
     </div>
   );
 }

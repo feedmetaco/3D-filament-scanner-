@@ -42,15 +42,15 @@ export default function Inventory() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'in_stock':
-        return 'text-green-400 bg-green-500/10 border-green-500/30';
+        return 'text-tertiary bg-tertiary/5 border-tertiary/30';
       case 'used_up':
-        return 'text-zinc-500 bg-zinc-800/50 border-zinc-700';
+        return 'text-muted bg-surfaceHighlight border-white/5';
       case 'donated':
-        return 'text-blue-400 bg-blue-500/10 border-blue-500/30';
+        return 'text-primary bg-primary/5 border-primary/30';
       case 'lost':
-        return 'text-red-400 bg-red-500/10 border-red-500/30';
+        return 'text-secondary bg-secondary/5 border-secondary/30';
       default:
-        return 'text-zinc-400 bg-zinc-800 border-zinc-700';
+        return 'text-muted bg-surfaceHighlight border-white/5';
     }
   };
 
@@ -58,40 +58,46 @@ export default function Inventory() {
     return status.toUpperCase().replace('_', ' ');
   };
 
+  // Helper to calculate total spools per product if needed, but user asked to replace diameter with spool count.
+  // Since we are listing individual spools, maybe they mean "Spool #123" or similar?
+  // Or maybe they want to group by product?
+  // Based on "instead of 1.75mm it should say number of spool", I'll interpret this as showing the Spool ID or a sequential count.
+  // Let's stick to showing the Spool ID for now as it's unique.
+
   if (loading) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-6 flex items-center justify-center min-h-[50vh]">
-        <div className="text-center space-y-3">
-          <svg className="animate-spin h-8 w-8 text-cyan-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <p className="text-sm font-mono text-zinc-500">LOADING INVENTORY...</p>
+      <div className="max-w-md mx-auto px-4 py-6 flex items-center justify-center min-h-[50vh]">
+        <div className="text-center space-y-4">
+          <div className="relative w-16 h-16 mx-auto">
+             <div className="absolute inset-0 border-t-2 border-primary rounded-full animate-spin"></div>
+             <div className="absolute inset-2 border-b-2 border-secondary rounded-full animate-spin duration-300"></div>
+          </div>
+          <p className="text-xs font-mono text-primary tracking-widest uppercase animate-pulse">Accessing Database...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-md mx-auto space-y-6 pb-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-end justify-between border-b border-white/10 pb-4">
         <div>
-          <h2 className="text-2xl font-mono tracking-tight">Inventory</h2>
-          <p className="text-sm text-zinc-500 font-mono mt-1">
-            {filteredSpools.length} SPOOL{filteredSpools.length !== 1 ? 'S' : ''}
+          <h2 className="text-xl font-bold text-white tracking-wider uppercase">Inventory</h2>
+          <p className="text-xs text-muted font-mono mt-1">
+             DATA_COUNT: <span className="text-primary">{filteredSpools.length}</span> UNITS
           </p>
         </div>
         <Link
           to="/spools/new"
-          className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-sm transition-colors"
+          className="px-4 py-2 bg-primary/10 hover:bg-primary/20 border border-primary/50 hover:border-primary text-primary font-mono text-xs font-bold tracking-widest transition-all uppercase clip-corner"
         >
-          + ADD
+          + Register_Unit
         </Link>
       </div>
 
       {/* Filters */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide mask-fade-right">
         {[
           { label: 'ALL', value: 'all' },
           { label: 'IN STOCK', value: 'in_stock' },
@@ -102,10 +108,10 @@ export default function Inventory() {
           <button
             key={value}
             onClick={() => setFilter(value)}
-            className={`px-3 py-1.5 text-xs font-mono whitespace-nowrap transition-all ${
+            className={`px-3 py-1.5 text-[10px] font-mono font-bold tracking-wider whitespace-nowrap transition-all uppercase border clip-corner ${
               filter === value
-                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                : 'bg-zinc-800 text-zinc-400 border border-zinc-700 hover:text-zinc-100'
+                ? 'bg-primary/20 text-primary border-primary'
+                : 'bg-surface text-muted border-white/10 hover:text-white hover:border-white/30'
             }`}
           >
             {label}
@@ -115,18 +121,21 @@ export default function Inventory() {
 
       {/* Spool List */}
       {filteredSpools.length === 0 ? (
-        <div className="text-center py-12 space-y-3">
-          <div className="w-16 h-16 mx-auto border-2 border-dashed border-zinc-700 rounded-lg flex items-center justify-center">
-            <svg className="w-8 h-8 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="text-center py-12 space-y-4 border border-dashed border-white/10 rounded-lg bg-surface/30">
+          <div className="w-16 h-16 mx-auto border border-white/10 flex items-center justify-center rounded-full bg-black/20">
+            <svg className="w-8 h-8 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
             </svg>
           </div>
-          <p className="text-sm font-mono text-zinc-500">NO SPOOLS FOUND</p>
+          <div>
+             <p className="text-sm font-bold text-white uppercase tracking-wide">No Data Found</p>
+             <p className="text-xs font-mono text-muted mt-1">Query returned 0 results.</p>
+          </div>
           <Link
             to="/scanner"
-            className="inline-block px-6 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-sm transition-colors"
+            className="inline-block px-6 py-2 bg-primary/10 hover:bg-primary/20 text-primary font-mono text-xs font-bold tracking-widest uppercase transition-colors border border-primary/50 clip-corner"
           >
-            SCAN FIRST SPOOL
+            Initiate Scan
           </Link>
         </div>
       ) : (
@@ -135,22 +144,38 @@ export default function Inventory() {
             <Link
               key={spool.id}
               to={`/spools/${spool.id}/edit`}
-              className="block bg-zinc-900/50 border border-zinc-800 hover:border-zinc-700 rounded-lg p-4 transition-all group"
+              className="block bg-surface border border-white/5 hover:border-primary/50 hover:bg-white/5 transition-all group relative overflow-hidden clip-corner pl-1"
             >
-              <div className="flex items-start justify-between gap-4">
+               {/* Status Indicator Line */}
+               <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${
+                  spool.status === 'in_stock' ? 'bg-tertiary' : 
+                  spool.status === 'used_up' ? 'bg-muted' :
+                  spool.status === 'donated' ? 'bg-primary' : 'bg-secondary'
+               }`}></div>
+
+              <div className="p-4 flex items-start justify-between gap-4">
                 <div className="flex-1 space-y-2">
                   {/* Product Info */}
                   <div>
-                    <h3 className="font-mono text-sm text-zinc-100 group-hover:text-cyan-400 transition-colors">
-                      {spool.product?.brand || 'Unknown'} {spool.product?.material || 'Material'}
-                    </h3>
-                    <p className="text-sm text-zinc-400 font-mono mt-0.5">
-                      {spool.product?.color_name || 'Color'} · {spool.product?.diameter_mm || '1.75'}mm
+                    <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-base text-white group-hover:text-primary transition-colors uppercase tracking-wide">
+                        {spool.product?.brand || 'Unknown'}
+                        </h3>
+                        <span className="text-[10px] font-mono text-black bg-primary px-1 rounded-sm font-bold">
+                           {spool.product?.material || 'MAT'}
+                        </span>
+                    </div>
+                    
+                    <p className="text-xs text-muted font-mono mt-1 uppercase tracking-wider flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full`} style={{backgroundColor: 'white'}}></span>
+                      {spool.product?.color_name || 'Color'} 
+                      <span className="text-white/20">|</span>
+                      <span className="text-white">ID: #{spool.id}</span>
                     </p>
                   </div>
 
                   {/* Meta */}
-                  <div className="flex flex-wrap gap-2 text-xs font-mono text-zinc-500">
+                  <div className="flex flex-wrap gap-3 text-[10px] font-mono text-muted uppercase tracking-wider">
                     {spool.vendor && (
                       <span className="flex items-center gap-1">
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -159,16 +184,8 @@ export default function Inventory() {
                         {spool.vendor}
                       </span>
                     )}
-                    {spool.price && (
-                      <span className="flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        ${spool.price.toFixed(2)}
-                      </span>
-                    )}
                     {spool.storage_location && (
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1 text-tertiary">
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -180,8 +197,15 @@ export default function Inventory() {
                 </div>
 
                 {/* Status Badge */}
-                <div className={`px-2 py-1 border rounded text-xs font-mono whitespace-nowrap ${getStatusColor(spool.status)}`}>
-                  {getStatusLabel(spool.status)}
+                <div className="flex flex-col items-end gap-1">
+                   <div className={`px-2 py-0.5 border text-[10px] font-mono font-bold uppercase tracking-widest ${getStatusColor(spool.status)}`}>
+                     {getStatusLabel(spool.status)}
+                   </div>
+                   {spool.price && (
+                      <div className="text-xs font-mono text-white/70">
+                         ${spool.price.toFixed(2)}
+                      </div>
+                   )}
                 </div>
               </div>
             </Link>
