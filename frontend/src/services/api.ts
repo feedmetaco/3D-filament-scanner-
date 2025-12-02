@@ -38,6 +38,23 @@ export interface ParsedLabel {
   raw_text: string;
 }
 
+export interface InvoiceImportResult {
+  success: boolean;
+  products_created: number;
+  spools_created: number;
+  order_number: string;
+  order_date: string;
+  vendor: string;
+  items: Array<{
+    product_id: number;
+    brand: string;
+    material: string;
+    color_name: string;
+    quantity: number;
+    price?: number;
+  }>;
+}
+
 const api = axios.create({
   baseURL: `${API_BASE}/api/v1`,
   headers: {
@@ -73,5 +90,22 @@ export const ocrApi = {
     return api.post<ParsedLabel>('/ocr/parse-label', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
+  },
+};
+
+export const invoiceApi = {
+  parseInvoice: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/invoice/parse', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  importInvoice: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<InvoiceImportResult>('/invoice/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(response => response.data);
   },
 };

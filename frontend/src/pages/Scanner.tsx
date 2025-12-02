@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ocrApi, productsApi, spoolsApi } from '../services/api';
+import { ocrApi, productsApi, spoolsApi, invoiceApi } from '../services/api';
 import type { ParsedLabel } from '../services/api';
 
 export default function Scanner() {
@@ -115,6 +115,32 @@ export default function Scanner() {
     }
   };
 
+  const handlePdfUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    try {
+      const result = await invoiceApi.importInvoice(file);
+
+      alert(
+        `Invoice imported successfully!\n\n` +
+        `Order: ${result.order_number}\n` +
+        `Vendor: ${result.vendor}\n` +
+        `Products created: ${result.products_created}\n` +
+        `Spools created: ${result.spools_created}`
+      );
+
+      // Navigate to inventory
+      navigate('/inventory');
+    } catch (error) {
+      console.error('PDF import failed:', error);
+      alert('Failed to import PDF invoice. Please try again or check the file format.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
       {/* Header */}
@@ -161,6 +187,31 @@ export default function Scanner() {
           >
             OR ENTER MANUALLY
           </button>
+
+          {/* PDF Invoice Upload */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-zinc-800"></div>
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-zinc-600 font-mono">Or bulk import</span>
+            </div>
+          </div>
+
+          <label className="w-full block">
+            <input
+              type="file"
+              accept="application/pdf"
+              onChange={handlePdfUpload}
+              className="hidden"
+            />
+            <div className="w-full py-3 bg-purple-900/30 hover:bg-purple-900/50 border border-purple-700/50 text-purple-300 font-mono text-sm transition-colors cursor-pointer text-center flex items-center justify-center gap-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              UPLOAD PDF INVOICE
+            </div>
+          </label>
         </div>
       )}
 
