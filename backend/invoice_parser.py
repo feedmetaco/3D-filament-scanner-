@@ -117,6 +117,8 @@ class InvoiceParser:
                 color_match = re.search(r"Variant:\s*([^(]+?)\s*\(", variant_line)
                 if color_match:
                     color_name = color_match.group(1).strip()
+                    # Clean up color name - remove trailing TAX, WA STATE, etc.
+                    color_name = re.sub(r'\s+(TAX|WA STATE|WA CITY).*$', '', color_name, flags=re.IGNORECASE).strip()
 
                 # Extract material type from product name
                 material = None

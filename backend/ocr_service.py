@@ -170,24 +170,34 @@ class LabelParser:
                 result["material"] = "TPU"
 
         # Color
-        # First try brand-specific pattern
-        color_match = re.search(patterns["color"], text, re.IGNORECASE)
-        if color_match:
-            color_candidate = color_match.group(1).strip()
-            # Filter out invalid colors (single letters, numbers, etc.)
-            if len(color_candidate) > 1 and not re.match(r'^[A-Z0-9]{1,2}$', color_candidate):
-                result["color_name"] = color_candidate.title()
+        # Try common color word search first (more reliable than regex patterns)
+        common_colors = ["White", "Black", "Red", "Blue", "Green", "Yellow",
+                       "Orange", "Purple", "Grey", "Gray", "Silver", "Gold",
+                       "Pink", "Brown", "Natural", "Transparent", "Cyan", "Magenta"]
 
-        # If no valid color found, try fallback
+        for color in common_colors:
+            if re.search(r'\b' + color + r'\b', text, re.IGNORECASE):
+                result["color_name"] = color
+                break
+
+        # If no common color found, try brand-specific pattern
         if not result["color_name"]:
-            # Fallback: search for common colors anywhere in text
-            common_colors = ["White", "Black", "Red", "Blue", "Green", "Yellow",
-                           "Orange", "Purple", "Grey", "Gray", "Silver", "Gold",
-                           "Pink", "Brown", "Natural", "Transparent"]
-            for color in common_colors:
-                if re.search(r'\b' + color + r'\b', text, re.IGNORECASE):
-                    result["color_name"] = color
-                    break
+            color_match = re.search(patterns["color"], text, re.IGNORECASE)
+            if color_match:
+                color_candidate = color_match.group(1).strip()
+                # Filter out invalid colors (brand names, materials, single letters, etc.)
+                invalid_patterns = [
+                    r'^[A-Z0-9]{1,3}$',  # Short codes like "A1", "HIF"
+                    r'(?i)^(esun|sunlu|bambu|pla|petg|abs|tpu|filament)',  # Brand/material names
+                ]
+                is_valid = True
+                for pattern in invalid_patterns:
+                    if re.match(pattern, color_candidate):
+                        is_valid = False
+                        break
+
+                if is_valid and len(color_candidate) > 3:
+                    result["color_name"] = color_candidate.title()
 
         # Diameter
         diameter_match = re.search(patterns["diameter"], text)
