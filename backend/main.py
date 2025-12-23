@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,9 +13,10 @@ from backend.models import (
     ProductUpdate,
     Spool,
     SpoolCreate,
+    SpoolChangeLog,
+    SpoolDetail,
     SpoolUpdate,
 )
-from sqlmodel import SQLModel
 from backend.ocr_service import LabelParser
 from backend.invoice_parser import InvoiceParser
 
@@ -191,19 +192,46 @@ def create_spool(spool_in: SpoolCreate, session: Session = Depends(get_session))
     session.add(spool)
     session.commit()
     session.refresh(spool)
+
+    # Record initial state for audit trail
+    change_log = SpoolChangeLog(
+        spool_id=spool.id,
+        to_status=spool.status,
+        to_location=spool.storage_location,
+        note="Spool created",
+    )
+    session.add(change_log)
+    session.commit()
+
     return spool
 
 
 @app.get("/api/v1/spools", response_model=List[Spool], tags=["spools"])
 def list_spools(
+    brand: Optional[str] = None,
+    material: Optional[str] = None,
+    color_name: Optional[str] = None,
+    storage_location: Optional[str] = None,
     status: Optional[str] = None,
     session: Session = Depends(get_session)
 ) -> List[Spool]:
-    """List spools with optional filtering by status."""
+    """List spools with optional filtering by status, product metadata, and storage location."""
     query = select(Spool)
+
+    # Join with product table when product filters are used
+    if any([brand, material, color_name]):
+        query = query.join(Product)
 
     if status:
         query = query.where(Spool.status == status)
+    if brand:
+        query = query.where(Product.brand.ilike(f"%{brand}%"))
+    if material:
+        query = query.where(Product.material.ilike(f"%{material}%"))
+    if color_name:
+        query = query.where(Product.color_name.ilike(f"%{color_name}%"))
+    if storage_location:
+        query = query.where(Spool.storage_location.ilike(f"%{storage_location}%"))
 
     spools = session.exec(query).all()
     return spools
@@ -252,21 +280,35 @@ def list_spools_with_products(
     return result
 
 
-@app.get("/api/v1/spools/{spool_id}", response_model=Spool, tags=["spools"])
-def get_spool(spool_id: int, session: Session = Depends(get_session)) -> Spool:
+def _build_spool_detail(spool: Spool, session: Session) -> SpoolDetail:
+    change_logs = session.exec(
+        select(SpoolChangeLog)
+        .where(SpoolChangeLog.spool_id == spool.id)
+        .order_by(SpoolChangeLog.created_at.desc())
+    ).all()
+
+    spool_data = spool.model_dump()
+    return SpoolDetail.model_validate({**spool_data, "change_logs": change_logs})
+
+
+@app.get("/api/v1/spools/{spool_id}", response_model=SpoolDetail, tags=["spools"])
+def get_spool_with_history(spool_id: int, session: Session = Depends(get_session)) -> SpoolDetail:
     spool = session.get(Spool, spool_id)
     if not spool:
         raise HTTPException(status_code=404, detail="Spool not found")
-    return spool
+    return _build_spool_detail(spool, session)
 
 
-@app.put("/api/v1/spools/{spool_id}", response_model=Spool, tags=["spools"])
+@app.put("/api/v1/spools/{spool_id}", response_model=SpoolDetail, tags=["spools"])
 def update_spool(
     spool_id: int, spool_in: SpoolUpdate, session: Session = Depends(get_session)
-) -> Spool:
+) -> SpoolDetail:
     spool = session.get(Spool, spool_id)
     if not spool:
         raise HTTPException(status_code=404, detail="Spool not found")
+
+    previous_status = spool.status
+    previous_location = spool.storage_location
 
     update_data = spool_in.model_dump(exclude_unset=True)
     for key, value in update_data.items():
@@ -276,7 +318,22 @@ def update_spool(
     session.add(spool)
     session.commit()
     session.refresh(spool)
-    return spool
+
+    status_changed = "status" in update_data and previous_status != spool.status
+    location_changed = "storage_location" in update_data and previous_location != spool.storage_location
+
+    if status_changed or location_changed:
+        change_log = SpoolChangeLog(
+            spool_id=spool.id,
+            from_status=previous_status if status_changed else None,
+            to_status=spool.status if status_changed else None,
+            from_location=previous_location if location_changed else None,
+            to_location=spool.storage_location if location_changed else None,
+        )
+        session.add(change_log)
+        session.commit()
+
+    return _build_spool_detail(spool, session)
 
 
 @app.delete("/api/v1/spools/{spool_id}", status_code=204, tags=["spools"])
@@ -487,6 +544,15 @@ async def import_from_invoice(
         try:
             # Parse invoice
             invoice_data = InvoiceParser.parse_invoice(pdf_bytes)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Invoice parsing failed",
+                    "message": str(e),
+                    "suggestion": "This invoice format may not be supported. Currently supported: Bambu Lab invoices."
+                }
+            )
 
         products_created = 0
         spools_created = 0
@@ -550,16 +616,6 @@ async def import_from_invoice(
             "vendor": invoice_data["vendor"],
             "items": imported_items
         }
-        
-        except ValueError as e:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error": "Invoice parsing failed",
-                    "message": str(e),
-                    "suggestion": "This invoice format may not be supported. Currently supported: Bambu Lab invoices."
-                }
-            )
     except HTTPException:
         raise
     except Exception as e:

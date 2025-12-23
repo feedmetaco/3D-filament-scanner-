@@ -75,6 +75,10 @@ class Spool(SpoolBase, table=True):
     )
 
     product: Optional[Product] = Relationship(back_populates="spools")
+    change_logs: List["SpoolChangeLog"] = Relationship(
+        back_populates="spool",
+        sa_relationship_kwargs={"order_by": "SpoolChangeLog.created_at.desc()"},
+    )
 
 
 class SpoolCreate(SpoolBase):
@@ -90,3 +94,39 @@ class SpoolUpdate(SQLModel):
     photo_path: Optional[str] = None
     status: Optional[SpoolStatus] = None
     order_id: Optional[int] = None
+
+
+class SpoolChangeLogBase(SQLModel):
+    spool_id: int = Field(foreign_key="spool.id")
+    from_status: Optional[SpoolStatus] = None
+    to_status: Optional[SpoolStatus] = None
+    from_location: Optional[str] = None
+    to_location: Optional[str] = None
+    note: Optional[str] = None
+
+
+class SpoolChangeLog(SpoolChangeLogBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True)),
+    )
+
+    spool: Optional[Spool] = Relationship(back_populates="change_logs")
+
+
+class SpoolChangeLogRead(SpoolChangeLogBase):
+    id: int
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class SpoolDetail(SpoolBase):
+    id: int
+    order_id: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+    change_logs: List[SpoolChangeLogRead] = []
+
+    model_config = {"from_attributes": True}

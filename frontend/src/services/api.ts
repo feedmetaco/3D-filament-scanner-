@@ -19,6 +19,7 @@ export interface Product {
 export interface Spool {
   id: number;
   product_id: number;
+  order_id?: number;
   purchase_date?: string;
   vendor?: string;
   price?: number;
@@ -28,6 +29,19 @@ export interface Spool {
   created_at: string;
   updated_at: string;
 }
+
+export interface SpoolChangeLog {
+  id: number;
+  spool_id: number;
+  from_status?: Spool['status'] | null;
+  to_status?: Spool['status'] | null;
+  from_location?: string | null;
+  to_location?: string | null;
+  note?: string | null;
+  created_at: string;
+}
+
+export type SpoolDetail = Spool & { change_logs?: SpoolChangeLog[] };
 
 export interface ParsedLabel {
   brand: string | null;
@@ -74,12 +88,18 @@ export const productsApi = {
 };
 
 export const spoolsApi = {
-  list: (params?: { status?: string }) => api.get<Spool[]>('/spools', { params }),
-  get: (id: number) => api.get<Spool>(`/spools/${id}`),
+  list: (params?: {
+    status?: string;
+    brand?: string;
+    material?: string;
+    color_name?: string;
+    storage_location?: string;
+  }) => api.get<Spool[]>('/spools', { params }),
+  get: (id: number) => api.get<SpoolDetail>(`/spools/${id}`),
   create: (data: Omit<Spool, 'id' | 'created_at' | 'updated_at'>) =>
     api.post<Spool>('/spools', data),
   update: (id: number, data: Partial<Spool>) =>
-    api.put<Spool>(`/spools/${id}`, data),
+    api.put<SpoolDetail>(`/spools/${id}`, data),
   delete: (id: number) => api.delete(`/spools/${id}`),
 };
 
